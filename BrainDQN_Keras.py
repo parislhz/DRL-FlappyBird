@@ -13,12 +13,12 @@ from keras.models import Model
 import os
 
 # Hyper Parameters:
-FRAME_PER_ACTION = 1
+FRAME_PER_ACTION = 8
 GAMMA = 0.99  # decay rate of past observations
 OBSERVE = 100.  # timesteps to observe before training
 EXPLORE = 200000.  # frames over which to anneal epsilon
-FINAL_EPSILON = 0  # 0.001 # final value of epsilon
-INITIAL_EPSILON = 0  # 0.01 # starting value of epsilon
+FINAL_EPSILON = 0.01  # 0.001 # final value of epsilon
+INITIAL_EPSILON = 1  # 0.01 # starting value of epsilon
 REPLAY_MEMORY = 50000  # number of previous transitions to remember
 BATCH_SIZE = 32  # size of minibatch
 UPDATE_TIME = 100
@@ -40,9 +40,10 @@ class BrainDQN:
         self.model = self.createQNetwork()
 
         # loading networks weights
-        if os.path.isfile('weights.best.hd5'):
-            self.model.load_weights('weights.best.hd5')
+        if os.path.isfile('weights.best_simple.hd5'):
+            self.model.load_weights('weights.best_simple.hd5')
 
+    '''
     def createQNetwork(self):
         # network weights
         inputs_state = Input(shape=(4, 80, 80,))
@@ -65,6 +66,28 @@ class BrainDQN:
                       loss='mean_squared_error',
                       metrics=['accuracy'])
         return model
+    '''
+    def createQNetwork(self):
+        # network weights
+        inputs_state = Input(shape=(4, 8,))
+        x = Flatten()(inputs_state)
+        x = Dense(8, activation='relu')(x)
+        for i in range(8):
+            x1 = Dense(8, activation='relu')(x)
+            x = merge([x1, x], 'sum')
+        x = Dense(self.actions)(x)
+
+        inputs_action = Input(shape=(self.actions,))
+
+        outputs_q = merge([x, inputs_action], mode='dot', dot_axes=1)
+
+        model = Model(input=[inputs_state, inputs_action], output=outputs_q)
+        model.compile(optimizer='rmsprop',
+                      loss='mean_squared_error',
+                      metrics=['accuracy'])
+        model.summary()
+
+        return model
 
     def trainQNetwork(self):
         # Step 1: obtain random minibatch from replay memory
@@ -84,15 +107,15 @@ class BrainDQN:
             else:
                 y_batch.append(reward_batch[i] + GAMMA * np.max(QValue_batch[i]))
 
-        self.model.fit([np.asarray(state_batch), np.asarray(action_batch)], np.asarray(y_batch))
+        self.model.fit([np.asarray(state_batch), np.asarray(action_batch)], np.asarray(y_batch), verbose=0)
 
         # save network every 10000 iteration
         if self.timeStep % 10000 == 0:
-            self.model.save_weights('weights.best.hd5')
+            self.model.save_weights('weights.best_simple.hd5')
 
     def setPerception(self, nextObservation, action, reward, terminal):
         #newState = np.append(self.currentState[1:, :, :], nextObservation, axis=0)
-        newState = np.append(self.currentState[1:, :, :], nextObservation, axis=0)
+        newState = np.append(self.currentState[1:, :], np.asarray([nextObservation]), axis=0)
         self.replayMemory.append((self.currentState, action, reward, newState, terminal))
         if len(self.replayMemory) > REPLAY_MEMORY:
             self.replayMemory.popleft()
@@ -109,13 +132,19 @@ class BrainDQN:
         else:
             state = "train"
 
-        print "TIMESTEP", self.timeStep, "/ STATE", state, \
-            "/ EPSILON", self.epsilon
+        if self.timeStep % 100 == 0:
+            print "TIMESTEP", self.timeStep, "/ STATE", state, \
+                "/ EPSILON", self.epsilon
 
         self.currentState = newState
         self.timeStep += 1
 
     def getAction(self):
+        # QValue = self.model.predict([np.asarray(
+        #     [self.currentState for i in range(self.actions)]), self.action_space])
+        # action_index = np.argmax(QValue)
+        # action = self.action_space[action_index]
+
         if self.timeStep % FRAME_PER_ACTION == 0:
             if random.random() <= self.epsilon:
                 action_index = random.randrange(self.actions)
@@ -126,7 +155,7 @@ class BrainDQN:
                 action_index = np.argmax(QValue)
                 action = self.action_space[action_index]
         else:
-            action = self.action_space[1]  # do nothing
+            action = self.action_space[0]  # do nothing
 
         # change episilon
         if self.epsilon > FINAL_EPSILON and self.timeStep > OBSERVE:

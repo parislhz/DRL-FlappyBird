@@ -8,7 +8,7 @@ from pygame.locals import *
 from itertools import cycle
 
 FPS = 30
-SCREENWIDTH  = 288
+SCREENWIDTH = 288
 SCREENHEIGHT = 512
 
 pygame.init()
@@ -17,8 +17,7 @@ SCREEN = pygame.display.set_mode((SCREENWIDTH, SCREENHEIGHT))
 pygame.display.set_caption('Flappy Bird')
 
 IMAGES, SOUNDS, HITMASKS = flappy_bird_utils.load()
-PIPEGAPSIZE = 230 # gap between upper and lower part of pipe
-#PIPEGAPSIZE = 100 # gap between upper and lower part of pipe
+PIPEGAPSIZE = 100 # gap between upper and lower part of pipe
 BASEY = SCREENHEIGHT * 0.79
 
 PLAYER_WIDTH = IMAGES['player'][0].get_width()

@@ -30,17 +30,22 @@ def playFlappyBird():
     # Step 3: play game
     # Step 3.1: obtain init state
     action0 = np.array([1, 0])  # do nothing
-    observation0, reward0, terminal = flappyBird.frame_step(action0)
-    observation0 = cv2.cvtColor(cv2.resize(observation0, (80, 80)), cv2.COLOR_BGR2GRAY)
-    ret, observation0 = cv2.threshold(observation0, 1, 255, cv2.THRESH_BINARY)
-    brain.setInitState(observation0)
+    observation0, reward0, terminal, positions = flappyBird.frame_step(action0)
+    #observation0 = cv2.cvtColor(cv2.resize(observation0, (80, 80)), cv2.COLOR_BGR2GRAY)
+    #ret, observation0 = cv2.threshold(observation0, 1, 255, cv2.THRESH_BINARY)
+    #brain.setInitState(observation0)
+    brain.setInitState(positions)
 
     # Step 3.2: run the game
     while 1 != 0:
         action = brain.getAction()
-        nextObservation, reward, terminal = flappyBird.frame_step(action)
-        nextObservation = preprocess(nextObservation)
-        brain.setPerception(nextObservation, action, reward, terminal)
+        nextObservation, reward, terminal, next_positions = flappyBird.frame_step(action)
+        #nextObservation = preprocess(nextObservation)
+        #brain.setPerception(nextObservation, action, reward, terminal)
+        #reward -= abs(next_positions[1] - 24)/(1120.)
+        if reward >= 1:
+            print reward
+        brain.setPerception(next_positions, action, reward, terminal)
 
 
 def main():
