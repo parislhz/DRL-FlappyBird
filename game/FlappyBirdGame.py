@@ -227,8 +227,8 @@ class FlappyBirdGame:
         for uPipe, lPipe in zip(self.upper_pipes, self.lower_pipes):
             self.screen.blit(self.RES_IMAGES['pipe'][0], (uPipe['x'], uPipe['y']))
             self.screen.blit(self.RES_IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
-            if uPipe['x'] > self.player_x and first_pipe:
-                positions[3] = uPipe['x'] - self.player_x
+            if uPipe['x'] + self.PIPE_WIDTH > self.player_x and first_pipe:
+                positions[3] = uPipe['x'] + self.PIPE_WIDTH - self.player_x
                 positions[4] = uPipe['y'] + self.PIPE_HEIGHT
                 positions[5] = lPipe['y']
                 first_pipe = False
@@ -237,7 +237,17 @@ class FlappyBirdGame:
         # print score so player overlaps the score
         self.show_score()
         self.screen.blit(self.RES_IMAGES['player'][self.playerIndex],
-                        (self.player_x, self.player_y))
+                         (self.player_x, self.player_y))
+
+        pygame.draw.line(self.screen, (0, 0, 255), (self.player_x, self.player_y),
+                         (positions[3] + self.player_x, self.player_y))
+        pygame.draw.line(self.screen, (0, 0, 255), (positions[3] + self.player_x, positions[4]),
+                         (positions[3] + self.player_x + 20, positions[4]))
+        pygame.draw.line(self.screen, (0, 0, 255), (positions[3] + self.player_x, positions[5]),
+                         (positions[3] + self.player_x + 20, positions[5]))
+        myfont = pygame.font.SysFont("monospace", 15)
+        label = myfont.render(str(self.playerVelY), 1, (0, 0, 255))
+        self.screen.blit(label, (self.player_x, self.player_y-15))
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
 

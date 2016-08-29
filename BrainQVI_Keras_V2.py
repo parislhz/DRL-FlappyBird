@@ -8,39 +8,43 @@ import numpy as np
 import random
 from collections import deque
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, merge
-from keras.layers.core import Flatten, Activation
+from keras.layers.core import Flatten, Activation, Dropout
 from keras.callbacks import Callback
 from keras.callbacks import TensorBoard
+from keras.optimizers import *
 from keras.models import Model
 import os
 import matplotlib.pyplot as plt
-
+import laplotter
 
 # Hyper Parameters:
-FRAME_PER_ACTION = 6
-GAMMA = 0.9  # decay rate of past observations
-OBSERVE = 100.  # time steps to observe before training
+FRAME_PER_ACTION = 4
+GAMMA = 0.95  # decay rate of past observations
+OBSERVE = 200.  # time steps to observe before training
 EXPLORE = 200000.  # frames over which to anneal epsilon
-FINAL_EPSILON = 0.01  # 0.001 # final value of epsilon
-INITIAL_EPSILON = 1  # 0.01 # starting value of epsilon
+FINAL_EPSILON = 0.001  # 0.001 # final value of epsilon
+INITIAL_EPSILON = .09  # 0.01 # starting value of epsilon
 REPLAY_MEMORY = 50000  # number of previous transitions to remember
 BATCH_SIZE = 32  # size of mini_batch
-UPDATE_TIME = 100
+UPDATE_TIME = 128
 
 
 class BrainQVICallback(Callback):
     def __init__(self):
         super(BrainQVICallback, self).__init__()
         self.batch_count = 0
+        # self.loss_rec = deque()
+        self.plotter = laplotter.LossAccPlotter(show_acc_plot=False)
 
     def on_train_begin(self, logs={}):
         pass
 
     def on_batch_end(self, batch, logs={}):
         self.batch_count += 1
-        if self.batch_count == 500:
-            self.batch_count = 0
+        # self.loss_rec.append(logs.get('loss'))
+        if self.batch_count % 500 == 0:
             print 'training loss:%10.4f, accuracy:%2.4f' % (logs.get('loss'), logs.get('acc'))
+            self.plotter.add_values(self.batch_count, loss_train=logs.get('loss'))
 
 
 class BrainQVI:
@@ -48,6 +52,8 @@ class BrainQVI:
 
         # init replay memory
         self.replay_memory = deque()
+        self.last30_memory = deque()
+        self.key_replay_memory = deque()
 
         # init some parameters
         self.time_step = 0
@@ -70,12 +76,12 @@ class BrainQVI:
         # network weights
         inputs_state = Input(shape=(state_shape,))
 
-        x_all = Dense(32, activation='relu')(inputs_state)
+        x_all = Dense(64, activation='relu')(inputs_state)
         for i in range(5):
             # x_all_1 = Dense(8, activation='relu')(x_all)
             # x_all = merge([x_all_1, x_all], 'sum')
-            x_all = Dense(32, activation='relu')(x_all)
-        x_all = Dense(32, activation='relu')(x_all)
+            x_all = Dense(64, activation='relu')(x_all)
+        x_all = Dense(64, activation='relu')(x_all)
         outputs_q = Dense(2)(x_all)
 
         model_q = Model(input=[inputs_state], output=[outputs_q])
@@ -84,7 +90,9 @@ class BrainQVI:
         outputs_qa = merge([outputs_q, inputs_action], mode='dot', dot_axes=1)
 
         model_qa = Model(input=[inputs_state, inputs_action], output=[outputs_qa])
-        model_qa.compile(optimizer='rmsprop', loss='mean_squared_error', metrics=['accuracy'])
+
+        optimizer = RMSprop(lr=1.e-6)
+        model_qa.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['accuracy'])
         model_q.summary()
         model_qa.summary()
 
@@ -94,20 +102,25 @@ class BrainQVI:
         # network weights
         inputs_state = Input(shape=(state_shape,))
 
-        x_all = Dense(32, activation='relu')(inputs_state)
+        x_all = Dense(64, activation='relu')(inputs_state)
         for i in range(5):
             # x_all_1 = Dense(8, activation='relu')(x_all)
             # x_all = merge([x_all_1, x_all], 'sum')
-            x_all = Dense(32, activation='relu')(x_all)
-        x_all = Dense(32, activation='relu')(x_all)
+            x_all = Dense(64, activation='relu')(x_all)
+        x_all = Dense(64, activation='relu')(x_all)
         outputs_q = Dense(2)(x_all)
 
         model_q_bk = Model(input=[inputs_state], output=[outputs_q])
         return model_q_bk
 
-    def train_q_network(self):
+    def train_q_network(self, key_memory=False):
         # Step 1: obtain random batch_data from replay memory
-        batch_data = random.sample(self.replay_memory, BATCH_SIZE)
+        if key_memory:
+            if len(self.key_replay_memory) <= BATCH_SIZE:
+                return
+            batch_data = random.sample(self.key_replay_memory, BATCH_SIZE)
+        else:
+            batch_data = random.sample(self.replay_memory, BATCH_SIZE)
 
         state_batch = [data[0] for data in batch_data]
         action_batch = [data[1] for data in batch_data]
@@ -140,8 +153,19 @@ class BrainQVI:
         self.replay_memory.append((self.current_state, self.action_space[action], reward, next_state, terminal))
         if len(self.replay_memory) > REPLAY_MEMORY:
             self.replay_memory.popleft()
+
+        self.last30_memory.append((self.current_state, self.action_space[action], reward, next_state, terminal))
+        if len(self.last30_memory) > 30:
+            self.last30_memory.popleft()
+        if reward == 1 or reward == -1:
+            for i in self.last30_memory:
+                self.key_replay_memory.append(i)
+            while len(self.key_replay_memory) > REPLAY_MEMORY:
+                self.key_replay_memory.popleft()
+
         if self.time_step > OBSERVE:
-            self.train_q_network()
+            self.train_q_network(key_memory=True)
+            self.train_q_network(key_memory=False)
 
         self.current_state = next_state
         self.time_step += 1
