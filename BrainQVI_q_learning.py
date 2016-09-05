@@ -37,7 +37,7 @@ class BrainQVIQLearning:
         self.actions = 2
         # self.q_space = np.zeros((600, 288, 18, 2))
         # self.q_space = np.zeros((600, 288, 2))
-        self.q_space = np.zeros((100, 70, 3, 2))
+        self.q_space = np.zeros((100, 70, 6, 2))
         self.current_state = []
         self.cum_q_change = 0
 
@@ -55,12 +55,18 @@ class BrainQVIQLearning:
         dist = state[3] // 2
         if dist >= 70:
             dist = 69
-        if state[1] < -2:
+        if state[1] <= -5:
             v = 0
-        elif state[1] < 2:
+        elif state[1] <= -2:
             v = 1
-        else:
+        elif state[1] <= 0:
             v = 2
+        elif state[1] <= 3:
+            v = 3
+        elif state[1] <= 6:
+            v = 4
+        else:
+            v = 5
 
         return [h, dist, v]
 
