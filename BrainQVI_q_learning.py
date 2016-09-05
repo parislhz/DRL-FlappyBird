@@ -19,20 +19,25 @@ import laplotter
 import h5py
 
 # Hyper Parameters:
-FRAME_PER_ACTION = 4
+FRAME_PER_ACTION = 1
 GAMMA = 0.99  # decay rate of past observations
 OBSERVE = 200.  # time steps to observe before training
 EXPLORE = 200000.  # frames over which to anneal epsilon
 FINAL_EPSILON = 0.001
 INITIAL_EPSILON = 0.01
-weights_file_name = 'weights.qvi.simple.hd5'
+ALPHA = 0.3
 
-class BrainQVISimple:
+weights_file_name = 'weights.qvi.qlearning_fmt.hd5'
+
+
+class BrainQVIQLearning:
     def __init__(self):
         self.time_step = 0
         self.epsilon = INITIAL_EPSILON
         self.actions = 2
-        self.q_space = np.zeros((600, 288, 18, 2))
+        # self.q_space = np.zeros((600, 288, 18, 2))
+        # self.q_space = np.zeros((600, 288, 2))
+        self.q_space = np.zeros((100, 70, 3, 2))
         self.current_state = []
         self.cum_q_change = 0
 
@@ -41,15 +46,36 @@ class BrainQVISimple:
             self.q_space = data_file['weights'][()]
             data_file.close()
 
+    def format_state(self, state):
+        h = (state[5] - state[0]) // 2 + 50
+        if h < 0:
+            h = 0
+        if h >= 100:
+            h = 99
+        dist = state[3] // 2
+        if dist >= 70:
+            dist = 69
+        if state[1] < -2:
+            v = 0
+        elif state[1] < 2:
+            v = 1
+        else:
+            v = 2
+
+        return [h, dist, v]
+
     def set_perception(self, next_state, action, reward, terminal):
-        n_state = [next_state[5] - next_state[0] + 300, next_state[3], next_state[1] + 7]
+        # n_state = [next_state[5] - next_state[0] + 300, next_state[3], next_state[1] + 7]
+        # n_state = [next_state[5] - next_state[0] + 300, next_state[3]]
+        n_state = self.format_state(next_state)
         state_action = self.current_state[:]
         state_action.append(action)
+        cur_q = self.q_space[tuple(state_action)]
         if terminal:
             new_q = reward
         else:
-            new_q = reward + GAMMA * np.max(self.q_space[tuple(n_state)])
-        self.cum_q_change += (self.q_space[tuple(state_action)] - new_q)
+            new_q = cur_q + ALPHA * (reward + GAMMA * np.max(self.q_space[tuple(n_state)]) - cur_q)
+        self.cum_q_change += abs(cur_q - new_q)
         self.q_space[tuple(state_action)] = new_q
 
         self.current_state = n_state
@@ -72,7 +98,7 @@ class BrainQVISimple:
                 action_index = random.randrange(self.actions)
             else:
                 q = self.q_space[tuple(self.current_state)]
-                print 'q value predict:', q
+                # print 'q value predict:', q
                 action_index = np.argmax(q)
         else:
             # do nothing
@@ -85,5 +111,7 @@ class BrainQVISimple:
         return action_index
 
     def set_init_state(self, state):
-        self.current_state = [state[5] - state[0] + 300, state[3], state[1] + 7]
+        # self.current_state = [state[5] - state[0] + 300, state[3], state[1] + 7]
+        # self.current_state = [state[5] - state[0] + 300, state[3]]
+        self.current_state = self.format_state(state)
 

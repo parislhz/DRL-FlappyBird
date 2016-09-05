@@ -216,7 +216,7 @@ class FlappyBirdGame:
             # SOUNDS['die'].play()
             terminal = True
             self.reset()
-            reward = -1
+            reward = -100
 
         # draw sprites
         self.screen.blit(self.RES_IMAGES['background'], (0, 0))

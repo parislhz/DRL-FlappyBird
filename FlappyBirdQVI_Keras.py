@@ -8,8 +8,9 @@ import sys
 import numpy as np
 import pygame
 
-from BrainQVI_Keras_V2 import BrainQVI
-from BrainQVI_simple import BrainQVISimple
+# from BrainQVI_Keras_V2 import BrainQVI
+# from BrainQVI_simple import BrainQVISimple
+from BrainQVI_q_learning import BrainQVIQLearning
 sys.path.append("game/")
 import FlappyBirdGame as fbg
 
@@ -18,8 +19,8 @@ class FlappyBirdTrainer:
     def __init__(self):
         self.action_space = np.eye(2)
         # self.brain = BrainQVI(2, 6)
-        self.brain = BrainQVISimple()
-        self.game = fbg.FlappyBirdGame(with_graph=True, fps=30, difficulty=10)
+        self.brain = BrainQVIQLearning()
+        self.game = fbg.FlappyBirdGame(with_graph=True, fps=0, difficulty=10)
         self.manual_action = False
 
     def get_action(self, brain=True):
